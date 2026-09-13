@@ -1,0 +1,11 @@
+1. usertrap() 调用了 syscall()。用户态执行 ecall 后先进入 trampoline 中的 uservec，随后进入 usertrap，usertrap 再调用系统调用分发函数 syscall。
+
+2. 在系统启动后的第一个 syscall 断点处，p->trapframe->a7 为 0xf，也就是十进制 15。a7 保存系统调用号，15 对应 SYS_open；init 进程先尝试打开 console。
+
+3. sstatus 的 SPP 位（第 8 位）为 0，说明陷阱发生前 CPU 处于 User mode。陷阱进入内核后，当前调试位置才处于 Supervisor mode。
+
+4. 把 num 的赋值临时改成 num = *(int*)0 后，故障指令是从 zero 寄存器指向的地址 0 读取一个 32 位字的 lw 指令。具体使用哪个目的寄存器由编译器分配，必须以本机构建出的 kernel/kernel.asm 和 panic 打印的 sepc 为准；寄存器中的值对应局部变量 num。
+
+5. xv6 的内核页表没有映射虚拟地址 0。该 lw 指令访问地址 0，因此触发 load page fault；scause=0xd 表示 Load page fault，stval=0x0 则确认故障地址为 0。
+
+6. 第一次进入 syscall() 时运行的是 init 进程，进程名为 init，pid 为 1。它执行 open("console", O_RDWR) 时进入内核，随后临时加入的非法取地址代码导致内核 panic。
